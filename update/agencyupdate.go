@@ -1,17 +1,17 @@
 package update
 
-// AUAPIResponse is the full repsonse form the API
-type AUAPIResponse struct {
+// AUAPIResponse is the full respsonse from the API
+type AGAPIResponse struct {
 	Status   string     `json:"status"`
-	Entities AUEntities `json:"response"`
+	Entities AGEntities `json:"response"`
 	Error    string     `json:"error"`
 }
 
 // AUEntites is simply a slice of AUEntity
-type AUEntities []AUEntity
+type AGEntities []AGEntity
 
 // AIEntity contains information about an individual Agency
-type AUEntity struct {
+type AGEntity struct {
 	AgencyName string `json:"agency_name"`
 	AgencyID   string `json:"agency_id"`
 }

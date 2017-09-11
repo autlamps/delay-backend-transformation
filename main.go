@@ -4,90 +4,191 @@ import (
 	"fmt"
 
 	"encoding/json"
+	"flag"
+	"github.com/autlamps/delay-backend-transformation/database"
+	"github.com/autlamps/delay-backend-transformation/input"
 	"github.com/autlamps/delay-backend-transformation/update"
+	"github.com/google/uuid"
 	_ "github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"log"
 	"net/http"
-	"flag"
 	"os"
-	"database/sql"
-	"github.com/google/uuid"
-	"github.com/autlamps/delay-backend-transformation/database"
-)
-
-const (
-	DB_USER     = "postgres"
-	DB_PASSWORD = "postgres"
-	DB_NAME     = "gtfs"
 )
 
 var API_KEY string
+var DB_URL string
+var ID_M map[string]uuid.UUID
 
 func init() {
 	flag.StringVar(&API_KEY, "API_KEY", "", "at api key")
+	flag.StringVar(&DB_URL, "DB_URL", "", "DB URL")
 	flag.Parse()
 
 	if API_KEY == "" {
 		API_KEY = os.Getenv("API_KEY")
 	}
+	if DB_URL == "" {
+		DB_URL = os.Getenv("DB_URL")
+	}
 
 }
 
 func main() {
-	ent, err := getAgency()
+	ID_M = make(map[string]uuid.UUID)
+	AGent, err := getAgency()
+	emptyErr(err)
+	ROent, err := getRoute()
+	emptyErr(err)
+	CAent, err := getCalender()
+	emptyErr(err)
+	STent, err := getStops()
+	emptyErr(err)
+	TRent, err := getTrip()
+	emptyErr(err)
 
+	db := database.CreateCon(DB_URL)
+	input.AgIn(AGent, db, ID_M)
+	input.RoIn(ROent, db, ID_M)
+	input.CaIn(CAent, db, ID_M)
+	input.StIn(STent, db, ID_M)
+	input.TrIn(TRent, db, ID_M)
+}
+
+func emptyErr(err string) {
 	if err != "" {
 		fmt.Println(err)
 	}
-	db := database.CreateCon()
-	insertDB(ent, db)
 }
 
-// Calls the AT API for Agency List and then creates agency classes
-func getAgency() (update.AUEntities, string) {
+// Calls the AT API for Agency List and then returns AGEntities
+func getAgency() (update.AGEntities, string) {
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/agency?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
 
 	if err != nil {
-		log.Fatalf("Failed to call api: %v",err)
+		log.Fatalf("Failed to call api: %v", err)
 	}
 
 	if resp.StatusCode == 403 {
-		fmt.Println("API key does not work")
+		log.Fatal("API key does not work (Agency)")
 	}
 
-	var ag update.AUAPIResponse
+	var ag update.AGAPIResponse
 
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&ag)
 
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal(err)
 	}
 
 	fmt.Println(ag.Entities)
 	return ag.Entities, ag.Error
 }
 
-func insertDB(entities update.AUEntities, db *sql.DB)  {
+func getRoute() (update.ROEntities, string) {
+	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/routes?api_key=%v", API_KEY)
 
-	for i := 0; i < len(entities); i++ {
-		gtfs_agency_id := entities[i].AgencyID
-		agency_name := entities[i].AgencyName
-		agen_contents_uuid, err := uuid.NewRandom()
-		if err != nil {
-			fmt.Println("No new UUID")
-			log.Fatal(err.Error())
-		}
+	resp, err := http.Get(urlWithKey)
 
-		printls, err := db.Exec("INSERT INTO agency (gtfs_agency_id, agency_name, agency_id) VALUES ($1, $2, $3);", gtfs_agency_id, agency_name, agen_contents_uuid )
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		printls.LastInsertId()
+	if err != nil {
+		log.Fatalf("Failed to call api: %v", err)
 	}
-	fmt.Println("Done")
+
+	if resp.StatusCode == 403 {
+		log.Fatal("API key does not work (Route)")
+	}
+
+	var ro update.ROAPIResponse
+
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&ro)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return ro.Entities, ro.Error
+}
+
+func getTrip() (update.TREntities, string) {
+	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/trips?api_key=%v", API_KEY)
+
+	resp, err := http.Get(urlWithKey)
+
+	if err != nil {
+		log.Fatalf("Failed to call api: %v", err)
+	}
+
+	if resp.StatusCode == 403 {
+		log.Fatal("API key does not work (Trip)")
+	}
+
+	var tr update.TRAPIResponse
+
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&tr)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return tr.Entities, tr.Error
+}
+
+func getCalender() (update.CAEntities, string) {
+	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/calendar?api_key=%v", API_KEY)
+
+	resp, err := http.Get(urlWithKey)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if resp.StatusCode == 403 {
+		fmt.Println("API key does not work (Calender)")
+	}
+
+	var ca update.CAAPIResponse
+
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&ca)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return ca.Entities, ca.Error
+}
+
+func getStops() (update.STEntities, string) {
+	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/calendar?api_key=%v", API_KEY)
+
+	resp, err := http.Get(urlWithKey)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if resp.StatusCode == 403 {
+		fmt.Println("API key does not work (stops)")
+	}
+
+	var st update.STAPIResponse
+
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&st)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return st.Entities, st.Error
 }

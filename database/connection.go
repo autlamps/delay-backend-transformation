@@ -6,9 +6,8 @@ import (
 	"log"
 )
 
-func CreateCon() *sql.DB {
-	db, err := sql.Open("postgres", "postgresql://postgres:postgres@127.0.0.1/gtfs?sslmode=disable")
-
+func CreateCon(DB_URL string) *sql.DB {
+	db, err := sql.Open("postgres", DB_URL)
 	if err != nil {
 		fmt.Println(err)
 	}
