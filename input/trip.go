@@ -23,7 +23,10 @@ func TrIn( entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
 
 		m[gtfs_trip_id] = trip_id
 
-		db.Exec("INSERT INTO trips (gtfs_trip_id, trip_id, route_id, trip_headsign, trip_short_name, service_id) VALUES ($1, $2, $3, $4, $5, $6);", gtfs_trip_id, trip_id, route_id, trip_headsign, trip_short_name, service_id)
+		_, err = db.Exec("INSERT INTO trips (gtfs_trip_id, trip_id, route_id, trip_headsign, trip_short_name, service_id) VALUES ($1, $2, $3, $4, $5, $6);", gtfs_trip_id, trip_id, route_id, trip_headsign, trip_short_name, service_id)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	fmt.Println("Done Trips")
 }

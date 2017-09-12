@@ -1,10 +1,11 @@
 package input
 
 import (
-	"github.com/autlamps/delay-backend-transformation/update"
 	"database/sql"
-	"github.com/google/uuid"
 	"fmt"
+	"github.com/autlamps/delay-backend-transformation/update"
+	"github.com/google/uuid"
+	"log"
 )
 
 func StIn(entities update.STEntities, db *sql.DB, m map[string]uuid.UUID) {
@@ -13,9 +14,15 @@ func StIn(entities update.STEntities, db *sql.DB, m map[string]uuid.UUID) {
 		stop_name := entities[i].StopName
 		stop_lat := entities[i].StopLat
 		stop_lon := entities[i].StopLon
-		stop_id := entities[i].StopID
-
-		db.Exec("INSERT INTO stops (stop_id, stop_code, stop_name, stop_lat, stop_lon) VALUES ($1, $2, $3, $4, $5);",stop_id, stop_code, stop_name, stop_lat, stop_lon)
+		stop_id, err := uuid.NewRandom()
+		if err != nil {
+			log.Fatal(err)
+		}
+		m[entities[i].StopID] = stop_id
+		_, err = db.Exec("INSERT INTO stops (stop_id, stop_code, stop_name, stop_lat, stop_lon) VALUES ($1, $2, $3, $4, $5);", stop_id, stop_code, stop_name, stop_lat, stop_lon)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	fmt.Println("Done Stops")
 }

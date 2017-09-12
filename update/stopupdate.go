@@ -11,9 +11,9 @@ type STAPIResponse struct {
 type STEntities []STEntity
 
 type STEntity struct {
-	StopID   string `json:"stop_id"`
-	StopCode string `json:"stop_code"`
-	StopName string `json:"stop_name"`
-	StopLat  string `json:"stop_lat"`
-	StopLon  string `json:"stop_lon"`
+	StopID   string  `json:"stop_id"`
+	StopCode string  `json:"stop_code"`
+	StopName string  `json:"stop_name"`
+	StopLat  float64 `json:"stop_lat"`
+	StopLon  float64 `json:"stop_lon"`
 }
