@@ -13,5 +13,4 @@ type TREntity struct {
 	ServiceID    string `json:"service_id"`
 	TripID       string `json:"trip_id"`
 	TripHeadSign string `json:"trip_headsign"`
-	TripSName    string `json:"trip_short_name"`
 }

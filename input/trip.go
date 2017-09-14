@@ -17,14 +17,13 @@ func TrIn(entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
 		log.Fatal(err)
 	}
 
-	stmt, err := tx.Prepare(pq.CopyIn("trips", "gtfs_trip_id", "trip_id", "route_id", "trip_headsign", "trip_short_name", "service_id"))
+	stmt, err := tx.Prepare(pq.CopyIn("trips", "gtfs_trip_id", "trip_id", "route_id", "trip_headsign", "service_id"))
 
 	for i := 0; i < len(entities); i++ {
 		route_id := m[entities[i].RouteID]
 		service_id := m[entities[i].ServiceID]
 		gtfs_trip_id := entities[i].TripID
 		trip_headsign := entities[i].TripHeadSign
-		trip_short_name := entities[i].TripSName
 		trip_id, err := uuid.NewRandom()
 
 		if err != nil {
@@ -33,7 +32,7 @@ func TrIn(entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
 
 		m[gtfs_trip_id] = trip_id
 
-		_, err = stmt.Exec(gtfs_trip_id, trip_id, route_id, trip_headsign, trip_short_name, service_id)
+		_, err = stmt.Exec(gtfs_trip_id, trip_id, route_id, trip_headsign, service_id)
 		if err != nil {
 			log.Fatal(err)
 		}

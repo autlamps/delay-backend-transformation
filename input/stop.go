@@ -18,6 +18,9 @@ func StIn(entities update.STEntities, db *sql.DB, m map[string]uuid.UUID) {
 	}
 
 	stmt, err := tx.Prepare(pq.CopyIn("stops", "stop_id", "stop_code", "stop_name", "stop_lat", "stop_lon"))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for i := 0; i < len(entities); i++ {
 		stop_code := entities[i].StopCode
