@@ -3,7 +3,7 @@ package update
 type TRAPIResponse struct {
 	Status   string     `json:"status"`
 	Entities TREntities `json:"response"`
-	Error    string     `json:"error"`
+	Error    error      `json:"error"`
 }
 
 type TREntities []TREntity

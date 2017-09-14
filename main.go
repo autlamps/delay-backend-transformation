@@ -1,11 +1,10 @@
 package main
 
 import (
-	"fmt"
-
 	"encoding/csv"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/autlamps/delay-backend-transformation/database"
 	"github.com/autlamps/delay-backend-transformation/input"
 	"github.com/autlamps/delay-backend-transformation/update"
@@ -16,7 +15,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -41,38 +40,59 @@ func init() {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	t := time.Now()
 	ID_M = make(map[string]uuid.UUID)
-	AGent, err := getAgency()
-	emptyErr(err)
-	ROent, err := getRoute()
-	emptyErr(err)
-	CAent, err := getCalender()
-	emptyErr(err)
-	STent, err := getStops()
-	emptyErr(err)
-	TRent, err := getTrip()
-	emptyErr(err)
-	STTent := getStopTrips()
+
+	ag := make(chan update.AGEntities)
+	ro := make(chan update.ROEntities)
+	ca := make(chan update.CAEntities)
+	st := make(chan update.STEntities)
+	tr := make(chan update.TREntities)
+	stt := make(chan update.STTEntities)
+
+	go getAgency(ag)
+	go getRoute(ro)
+	go getCalender(ca)
+	go getStops(st)
+	go getTrip(tr)
+	go getStopTrips(stt)
+
+	AGent := <-ag
+	ROent := <-ro
+	CAent := <-ca
+	STent := <-st
+	TRent := <-tr
+	STTent := <-stt
+
+	//STTent := getStopTrips()
+	//fmt.Println(time.Now().Sub(t))
 
 	db := database.CreateCon(DB_URL)
 	input.AgIn(AGent, db, ID_M)
+	fmt.Println(time.Now().Sub(t))
 	input.RoIn(ROent, db, ID_M)
+	fmt.Println(time.Now().Sub(t))
 	input.CaIn(CAent, db, ID_M)
+	fmt.Println(time.Now().Sub(t))
 	input.StIn(STent, db, ID_M)
+	fmt.Println(time.Now().Sub(t))
 	input.TrIn(TRent, db, ID_M)
+	fmt.Println(time.Now().Sub(t))
 	input.SttIn(STTent, db, ID_M)
 	fmt.Println(time.Now().Sub(t))
 }
 
-func emptyErr(err string) {
-	if err != "" {
-		fmt.Println(err)
+func handleErr(err error) {
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
 // Calls the AT API for Agency List and then returns AGEntities
-func getAgency() (update.AGEntities, string) {
+func getAgency(c chan update.AGEntities) {
+	t := time.Now()
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/agency?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
@@ -94,11 +114,13 @@ func getAgency() (update.AGEntities, string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return ag.Entities, ag.Error
+	fmt.Println("Get Agencies done: ", time.Now().Sub(t))
+	c <- ag.Entities
 }
 
-func getRoute() (update.ROEntities, string) {
+// Calls the AT API for the Route list and then returns ROEntities
+func getRoute(c chan update.ROEntities) {
+	t := time.Now()
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/routes?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
@@ -121,10 +143,12 @@ func getRoute() (update.ROEntities, string) {
 		log.Fatal(err)
 	}
 
-	return ro.Entities, ro.Error
+	fmt.Println("Get Routes done: ", time.Now().Sub(t))
+	c <- ro.Entities
 }
 
-func getTrip() (update.TREntities, string) {
+func getTrip(c chan update.TREntities) {
+	t := time.Now()
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/trips?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
@@ -147,10 +171,12 @@ func getTrip() (update.TREntities, string) {
 		log.Fatal(err)
 	}
 
-	return tr.Entities, tr.Error
+	fmt.Println("Get Trips done: ", time.Now().Sub(t))
+	c <- tr.Entities
 }
 
-func getCalender() (update.CAEntities, string) {
+func getCalender(c chan update.CAEntities) {
+	t := time.Now()
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/calendar?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
@@ -172,11 +198,12 @@ func getCalender() (update.CAEntities, string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return ca.Entities, ca.Error
+	fmt.Println("Get Calendars done: ", time.Now().Sub(t))
+	c <- ca.Entities
 }
 
-func getStops() (update.STEntities, string) {
+func getStops(c chan update.STEntities) {
+	t := time.Now()
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/stops?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
@@ -199,11 +226,14 @@ func getStops() (update.STEntities, string) {
 		log.Fatal(err)
 	}
 
-	return st.Entities, st.Error
+	fmt.Println("Get Stops done: ", time.Now().Sub(t))
+	c <- st.Entities
 }
 
-func getStopTrips() update.STTEntities {
+func getStopTrips(c chan update.STTEntities) {
+	t := time.Now()
 	resp, err := http.Get("https://cdn01.at.govt.nz/data/stop_times.txt")
+	fmt.Println("Got StopTime file: ", time.Now().Sub(t))
 
 	if err != nil {
 		log.Fatal(err)
@@ -211,28 +241,6 @@ func getStopTrips() update.STTEntities {
 
 	defer resp.Body.Close()
 	r := csv.NewReader(resp.Body)
-
-	//for {
-	//	records, err := r.Read()
-	//	if err == io.EOF {
-	//		return stt
-	//	}
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//	for i := 1; i < len(records); i++ {
-	//		recsp := strings.Split(records[i], ",")
-	//		for k := 0; k < len(recsp); k++ {
-	//			trip_id := m[recsp[0]]
-	//			arrival_time := recsp[1]
-	//			departure_time := recsp[2]
-	//			stop_id := m[recsp[3]]
-	//			stop_sequence := recsp[4]
-	//			stt = update.STTEntity{TripID:trip_id, ArrivalTime:arrival_time, DepatureTime:departure_time, StopID:stop_id, StopSequence:stop_sequence}
-	//
-	//		}
-	//	}
-	//}
 
 	var ste update.STTEntities
 
@@ -254,18 +262,6 @@ func getStopTrips() update.STTEntities {
 			continue
 		}
 
-		//at, err := time.Parse("15:04:05", r[1])
-		//
-		//if err != nil {
-		//	fmt.Println(err)
-		//}
-		//
-		//dt, err := time.Parse("15:04:05", r[2])
-		//
-		//if err != nil {
-		//	log.Fatal(err)
-		//}
-
 		seq64, err := strconv.ParseInt(r[4], 10, 64)
 
 		if err != nil {
@@ -276,8 +272,8 @@ func getStopTrips() update.STTEntities {
 
 		nw := update.STTEntity{
 			TripID:       r[0],
-			ArrivalTime:  hrCheck(r[1]),
-			DepatureTime: hrCheck(r[2]),
+			ArrivalTime:  ParseTime(r[1]),
+			DepatureTime: ParseTime(r[2]),
 			StopID:       r[3],
 			StopSequence: seq,
 		}
@@ -286,16 +282,22 @@ func getStopTrips() update.STTEntities {
 
 		i++
 	}
-	return ste
+	fmt.Println("Get StopTimes done: ", time.Now().Sub(t))
+	c <- ste
 }
 
-func hrCheck(input string) time.Time {
-	matched, err := regexp.MatchString(`[2][4-9]:[\s\S][\s\S]:[\s\S][\s\S]`, input)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if matched == true {
-		str := strings.Split(input, ":")
+// TODO: move this into its a package that makes more sense
+// ParseTime parses GTFS time which can be greater than 24 hours to signify trips occurring over midnight and therefore
+// multiple days. However golang and psql dont recognize this so we must convert it to usable time
+func ParseTime(st string) time.Time {
+	ib := []byte(st)
+
+	// Check to see if the first char of our string is greater than the char 1 then see if
+	// the second char is greater than the char 3. If so our time is greater than 24 hours
+	matched := ib[0] > 49 && ib[1] > 51
+
+	if matched {
+		str := strings.Split(st, ":")
 
 		ot, err := strconv.Atoi(str[0])
 
@@ -306,11 +308,10 @@ func hrCheck(input string) time.Time {
 		ot = ot - 24
 		sot := strconv.Itoa(ot)
 
-		input = fmt.Sprintf("%v:%v:%v", sot, str[1], str[2])
-
+		st = fmt.Sprintf("%v:%v:%v", sot, str[1], str[2])
 	}
 
-	dt, err := time.Parse("15:04:05", input)
+	dt, err := time.Parse("15:04:05", st)
 
 	if err != nil {
 		log.Fatal(err)

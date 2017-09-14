@@ -5,7 +5,7 @@ package update
 type STAPIResponse struct {
 	Status   string     `json:"status"`
 	Entities STEntities `json:"response"`
-	Error    string     `json:"error"`
+	Error    error      `json:"error"`
 }
 
 type STEntities []STEntity

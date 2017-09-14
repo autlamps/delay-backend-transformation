@@ -1,14 +1,24 @@
 package input
 
 import (
-	"github.com/autlamps/delay-backend-transformation/update"
 	"database/sql"
-	"github.com/google/uuid"
-	"log"
 	"fmt"
+	"github.com/autlamps/delay-backend-transformation/update"
+	"github.com/google/uuid"
+	"github.com/lib/pq"
+	"log"
 )
 
-func TrIn( entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
+func TrIn(entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
+
+	tx, err := db.Begin()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stmt, err := tx.Prepare(pq.CopyIn("trips", "gtfs_trip_id", "trip_id", "route_id", "trip_headsign", "trip_short_name", "service_id"))
+
 	for i := 0; i < len(entities); i++ {
 		route_id := m[entities[i].RouteID]
 		service_id := m[entities[i].ServiceID]
@@ -23,10 +33,25 @@ func TrIn( entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
 
 		m[gtfs_trip_id] = trip_id
 
-		_, err = db.Exec("INSERT INTO trips (gtfs_trip_id, trip_id, route_id, trip_headsign, trip_short_name, service_id) VALUES ($1, $2, $3, $4, $5, $6);", gtfs_trip_id, trip_id, route_id, trip_headsign, trip_short_name, service_id)
+		_, err = stmt.Exec(gtfs_trip_id, trip_id, route_id, trip_headsign, trip_short_name, service_id)
 		if err != nil {
 			log.Fatal(err)
 		}
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = stmt.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal(err)
 	}
 	fmt.Println("Done Trips")
 }

@@ -4,7 +4,7 @@ package update
 type AGAPIResponse struct {
 	Status   string     `json:"status"`
 	Entities AGEntities `json:"response"`
-	Error    string     `json:"error"`
+	Error    error      `json:"error"`
 }
 
 // AUEntites is simply a slice of AUEntity

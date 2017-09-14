@@ -5,10 +5,18 @@ import (
 	"fmt"
 	"github.com/autlamps/delay-backend-transformation/update"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"log"
 )
 
 func AgIn(entities update.AGEntities, db *sql.DB, m map[string]uuid.UUID) {
+
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stmt, err := tx.Prepare(pq.CopyIn("agency", "gtfs_agency_id", "agency_name", "agency_id"))
 
 	for i := 0; i < len(entities); i++ {
 		gtfs_agency_id := entities[i].AgencyID
@@ -18,11 +26,27 @@ func AgIn(entities update.AGEntities, db *sql.DB, m map[string]uuid.UUID) {
 			fmt.Println("No new UUID")
 			log.Fatal(err.Error())
 		}
-		m[gtfs_agency_id]	= agency_id
+		m[gtfs_agency_id] = agency_id
 
-		db.Exec("INSERT INTO agency (gtfs_agency_id, agency_name, agency_id) VALUES ($1, $2, $3);", gtfs_agency_id, agency_name, agency_id)
+		_, err = stmt.Exec(gtfs_agency_id, agency_name, agency_id)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = stmt.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal(err)
 	}
 	fmt.Println("Done Agencies")
 }
-
-

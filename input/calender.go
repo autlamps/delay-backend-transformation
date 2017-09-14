@@ -6,9 +6,19 @@ import (
 	"github.com/autlamps/delay-backend-transformation/update"
 	"github.com/google/uuid"
 	"log"
+	"github.com/lib/pq"
 )
 
 func CaIn(entities update.CAEntities, db *sql.DB, m map[string]uuid.UUID) {
+
+	tx, err := db.Begin()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stmt, err := tx.Prepare(pq.CopyIn("calendar", "gtfs_service_id", "service_id", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"))
+
 	for i := 0; i < len(entities); i++ {
 		gtfs_service_id := entities[i].ServiceID
 		monday := boolcheck(entities[i].Monday)
@@ -24,7 +34,25 @@ func CaIn(entities update.CAEntities, db *sql.DB, m map[string]uuid.UUID) {
 		}
 		m[gtfs_service_id] = service_id
 
-		db.Exec("INSERT INTO calendar (gtfs_service_id, service_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);", gtfs_service_id, service_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday)
+		_, err = stmt.Exec(gtfs_service_id, service_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = stmt.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal(err)
 	}
 	fmt.Println("Done Calender")
 }

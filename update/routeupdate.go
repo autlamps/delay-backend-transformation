@@ -4,7 +4,7 @@ package update
 type ROAPIResponse struct {
 	Status   string     `json:"status"`
 	Entities ROEntities `json:"response"`
-	Error    string     `json:"error"`
+	Error    error      `json:"error"`
 }
 
 // ROEntities is an array of all ROEntity
