@@ -15,3 +15,8 @@ type AGEntity struct {
 	AgencyName string `json:"agency_name"`
 	AgencyID   string `json:"agency_id"`
 }
+
+type AGReturn struct {
+	Entities AGEntities
+	Error    error
+}

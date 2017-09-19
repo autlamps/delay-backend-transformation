@@ -14,3 +14,8 @@ type TREntity struct {
 	TripID       string `json:"trip_id"`
 	TripHeadSign string `json:"trip_headsign"`
 }
+
+type TRReturn struct {
+	Entities TREntities
+	Error    error
+}

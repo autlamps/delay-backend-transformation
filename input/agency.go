@@ -3,10 +3,11 @@ package input
 import (
 	"database/sql"
 	"fmt"
+	"log"
+
 	"github.com/autlamps/delay-backend-transformation/update"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"log"
 )
 
 func AgIn(entities update.AGEntities, db *sql.DB, m map[string]uuid.UUID) {

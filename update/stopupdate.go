@@ -17,3 +17,8 @@ type STEntity struct {
 	StopLat  float64 `json:"stop_lat"`
 	StopLon  float64 `json:"stop_lon"`
 }
+
+type STReturn struct {
+	Entities STEntities
+	Error    error
+}

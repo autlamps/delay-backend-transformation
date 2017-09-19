@@ -3,13 +3,15 @@ package input
 import (
 	"database/sql"
 	"fmt"
+	"log"
+
 	"github.com/autlamps/delay-backend-transformation/update"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"log"
 )
 
 func TrIn(entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
+	fmt.Println("Map addr %p", &m)
 
 	tx, err := db.Begin()
 
@@ -21,6 +23,8 @@ func TrIn(entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
 
 	for i := 0; i < len(entities); i++ {
 		route_id := m[entities[i].RouteID]
+		fmt.Println("GTFS ID: ", entities[i].RouteID)
+		fmt.Println("ID: ", route_id)
 		service_id := m[entities[i].ServiceID]
 		gtfs_trip_id := entities[i].TripID
 		trip_headsign := entities[i].TripHeadSign

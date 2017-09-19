@@ -18,3 +18,8 @@ type ROEntity struct {
 	RouteLName string `json:"route_long_name"`
 	RouteType  int    `json:"route_type"`
 }
+
+type ROReturn struct {
+	Entities ROEntities
+	Error    error
+}

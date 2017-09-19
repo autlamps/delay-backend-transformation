@@ -17,3 +17,8 @@ type STTEntity struct {
 	StopID       string
 	StopSequence int
 }
+
+type STTReturn struct {
+	Entities STTEntities
+	Error    error
+}

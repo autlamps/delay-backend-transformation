@@ -1,29 +1,34 @@
 package main
 
 import (
+	"flag"
+	"log"
+	"os"
+	"runtime"
+
 	"encoding/csv"
 	"encoding/json"
-	"flag"
 	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"errors"
+
 	"github.com/autlamps/delay-backend-transformation/database"
 	"github.com/autlamps/delay-backend-transformation/input"
 	"github.com/autlamps/delay-backend-transformation/update"
 	"github.com/google/uuid"
 	_ "github.com/google/uuid"
 	_ "github.com/lib/pq"
-	"io"
-	"log"
-	"net/http"
-	"os"
-	"runtime"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var API_KEY string
 var DB_URL string
 var ID_M map[string]uuid.UUID
+var HTTPForbiden = errors.New("HTTP 403 - Failed")
 
 func init() {
 	flag.StringVar(&API_KEY, "API_KEY", "", "at api key")
@@ -42,32 +47,66 @@ func init() {
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	version, err := getVersion()
+	fmt.Println(version)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	t := time.Now()
 	ID_M = make(map[string]uuid.UUID)
+	fmt.Printf("Map addr %p", &ID_M)
 
-	ag := make(chan update.AGEntities)
-	ro := make(chan update.ROEntities)
-	ca := make(chan update.CAEntities)
-	st := make(chan update.STEntities)
-	tr := make(chan update.TREntities)
-	stt := make(chan update.STTEntities)
+	ag := make(chan update.AGReturn)
+	ro := make(chan update.ROReturn)
+	ca := make(chan update.CAReturn)
+	st := make(chan update.STReturn)
+	tr := make(chan update.TRReturn)
+	//stt := make(chan update.STTReturn)
 
-	go getAgency(ag)
-	go getRoute(ro)
-	go getCalender(ca)
-	go getStops(st)
-	go getTrip(tr)
-	go getStopTrips(stt)
+	go getAgency(ag, version)
+	go getRoute(ro, version)
+	go getCalender(ca, version)
+	go getStops(st, version)
+	go getTrip(tr, version)
+	//go getStopTrips(stt, version)
 
-	AGent := <-ag
-	ROent := <-ro
-	CAent := <-ca
-	STent := <-st
-	TRent := <-tr
-	STTent := <-stt
+	AGret := <-ag
+	if AGret.Error != nil {
+		log.Fatal(AGret.Error)
+	}
+	AGent := AGret.Entities
 
-	//STTent := getStopTrips()
-	//fmt.Println(time.Now().Sub(t))
+	ROret := <-ro
+	if ROret.Error != nil {
+		log.Fatal(ROret.Error)
+	}
+	ROent := ROret.Entities
+
+	CAret := <-ca
+	if CAret.Error != nil {
+		log.Fatal(CAret.Error)
+	}
+	CAent := CAret.Entities
+
+	STret := <-st
+	if STret.Error != nil {
+		log.Fatal(STret.Error)
+	}
+	STent := STret.Entities
+
+	TRret := <-tr
+	if TRret.Error != nil {
+		log.Fatal(TRret.Error)
+	}
+	TRent := TRret.Entities
+
+	//STTret := <-stt
+	//if STTret.Error != nil {
+	//	log.Fatal(STTret.Error)
+	//}
+	//STTent := STTret.Entities
 
 	db := database.CreateCon(DB_URL)
 	input.AgIn(AGent, db, ID_M)
@@ -80,29 +119,53 @@ func main() {
 	fmt.Println(time.Now().Sub(t))
 	input.TrIn(TRent, db, ID_M)
 	fmt.Println(time.Now().Sub(t))
-	input.SttIn(STTent, db, ID_M)
+	//input.SttIn(STTent, db, ID_M)
 	fmt.Println(time.Now().Sub(t))
+
 }
 
-func handleErr(err error) {
+func getVersion() (ver string, err error) {
+	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/versions?api_key=%v", API_KEY)
+
+	resp, err := http.Get(urlWithKey)
+
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
+
+	if resp.StatusCode == 403 {
+		return "", HTTPForbiden
+	}
+
+	var vr update.VRAPIResponse
+
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&vr)
+
+	if err != nil {
+		return "", err
+	}
+
+	return vr.ATVerDet[0].ATVersion, nil
 }
 
 // Calls the AT API for Agency List and then returns AGEntities
-func getAgency(c chan update.AGEntities) {
+func getAgency(c chan<- update.AGReturn, ver string) {
+	var toChan update.AGReturn
 	t := time.Now()
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/agency?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
 
 	if err != nil {
-		log.Fatalf("Failed to call api: %v", err)
+		toChan.Error = err
+		c <- toChan
 	}
 
 	if resp.StatusCode == 403 {
-		log.Fatal("API key does not work (Agency)")
+		toChan.Error = HTTPForbiden
+		c <- toChan
 	}
 
 	var ag update.AGAPIResponse
@@ -112,25 +175,33 @@ func getAgency(c chan update.AGEntities) {
 	err = decoder.Decode(&ag)
 
 	if err != nil {
-		log.Fatal(err)
+		toChan.Error = err
+		c <- toChan
 	}
 	fmt.Println("Get Agencies done: ", time.Now().Sub(t))
-	c <- ag.Entities
+
+	toChan.Entities = ag.Entities
+
+	c <- toChan
 }
 
-// Calls the AT API for the Route list and then returns ROEntities
-func getRoute(c chan update.ROEntities) {
+// Calls the AT API for the Route list and then returns
+// ROEntities
+func getRoute(c chan update.ROReturn, ver string) {
+	var toChan update.ROReturn
 	t := time.Now()
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/routes?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
 
 	if err != nil {
-		log.Fatalf("Failed to call api: %v", err)
+		toChan.Error = err
+		c <- toChan
 	}
 
 	if resp.StatusCode == 403 {
-		log.Fatal("API key does not work (Route)")
+		toChan.Error = HTTPForbiden
+		c <- toChan
 	}
 
 	var ro update.ROAPIResponse
@@ -139,26 +210,41 @@ func getRoute(c chan update.ROEntities) {
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&ro)
 
+	final := update.ROEntities{}
+
+	for _, a := range ro.Entities {
+		if strings.Contains(a.RouteID, ver) {
+			final = append(final, a)
+		}
+
+	}
+
 	if err != nil {
-		log.Fatal(err)
+		toChan.Error = err
+		c <- toChan
 	}
 
 	fmt.Println("Get Routes done: ", time.Now().Sub(t))
-	c <- ro.Entities
+
+	toChan.Entities = final
+	c <- toChan
 }
 
-func getTrip(c chan update.TREntities) {
+func getTrip(c chan update.TRReturn, ver string) {
+	var toChan update.TRReturn
 	t := time.Now()
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/trips?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
 
 	if err != nil {
-		log.Fatalf("Failed to call api: %v", err)
+		toChan.Error = err
+		c <- toChan
 	}
 
 	if resp.StatusCode == 403 {
-		log.Fatal("API key does not work (Trip)")
+		toChan.Error = HTTPForbiden
+		c <- toChan
 	}
 
 	var tr update.TRAPIResponse
@@ -167,22 +253,37 @@ func getTrip(c chan update.TREntities) {
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&tr)
 
-	if err != nil {
-		log.Fatal(err)
+	final := update.TREntities{}
+
+	for _, a := range tr.Entities {
+		if strings.Contains(a.TripID, ver) {
+			final = append(final, a)
+		}
+
 	}
 
+	if err != nil {
+		toChan.Error = err
+		c <- toChan
+	}
+
+	toChan.Entities = final
+
 	fmt.Println("Get Trips done: ", time.Now().Sub(t))
-	c <- tr.Entities
+
+	c <- toChan
 }
 
-func getCalender(c chan update.CAEntities) {
+func getCalender(c chan update.CAReturn, ver string) {
 	t := time.Now()
+	var toChan update.CAReturn
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/calendar?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
 
 	if err != nil {
-		log.Fatal(err)
+		toChan.Error = err
+		c <- toChan
 	}
 
 	if resp.StatusCode == 403 {
@@ -195,25 +296,41 @@ func getCalender(c chan update.CAEntities) {
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&ca)
 
-	if err != nil {
-		log.Fatal(err)
+	final := update.CAEntities{}
+
+	for _, a := range ca.Entities {
+		if strings.Contains(a.ServiceID, ver) {
+			final = append(final, a)
+		}
+
 	}
+
+	if err != nil {
+		toChan.Error = err
+		c <- toChan
+	}
+
+	toChan.Entities = final
+
 	fmt.Println("Get Calendars done: ", time.Now().Sub(t))
-	c <- ca.Entities
+	c <- toChan
 }
 
-func getStops(c chan update.STEntities) {
+func getStops(c chan update.STReturn, ver string) {
 	t := time.Now()
+	var toChan update.STReturn
 	urlWithKey := fmt.Sprintf("http://api.at.govt.nz/v1/gtfs/stops?api_key=%v", API_KEY)
 
 	resp, err := http.Get(urlWithKey)
 
 	if err != nil {
-		log.Fatal(err)
+		toChan.Error = err
+		c <- toChan
 	}
 
 	if resp.StatusCode == 403 {
-		fmt.Println("API key does not work (stops)")
+		toChan.Error = HTTPForbiden
+		c <- toChan
 	}
 
 	var st update.STAPIResponse
@@ -222,21 +339,34 @@ func getStops(c chan update.STEntities) {
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&st)
 
+	final := update.STEntities{}
+
+	for _, a := range st.Entities {
+		if strings.Contains(a.StopID, ver) {
+			final = append(final, a)
+		}
+
+	}
 	if err != nil {
-		log.Fatal(err)
+		toChan.Error = err
+		c <- toChan
 	}
 
+	toChan.Entities = final
+
 	fmt.Println("Get Stops done: ", time.Now().Sub(t))
-	c <- st.Entities
+	c <- toChan
 }
 
-func getStopTrips(c chan update.STTEntities) {
+func getStopTrips(c chan update.STTReturn, ver string) {
 	t := time.Now()
+	var toChan update.STTReturn
 	resp, err := http.Get("https://cdn01.at.govt.nz/data/stop_times.txt")
 	fmt.Println("Got StopTime file: ", time.Now().Sub(t))
 
 	if err != nil {
-		log.Fatal(err)
+		toChan.Error = err
+		c <- toChan
 	}
 
 	defer resp.Body.Close()
@@ -254,7 +384,8 @@ func getStopTrips(c chan update.STTEntities) {
 		}
 
 		if err != nil {
-			fmt.Println(err)
+			toChan.Error = err
+			c <- toChan
 		}
 
 		if i == 0 {
@@ -262,10 +393,16 @@ func getStopTrips(c chan update.STTEntities) {
 			continue
 		}
 
+		if strings.Contains(r[0], ver) {
+			i++
+			continue
+		}
+
 		seq64, err := strconv.ParseInt(r[4], 10, 64)
 
 		if err != nil {
-			log.Fatal(err)
+			toChan.Error = err
+			c <- toChan
 		}
 
 		seq := int(seq64)
@@ -282,8 +419,10 @@ func getStopTrips(c chan update.STTEntities) {
 
 		i++
 	}
+
+	toChan.Entities = ste
 	fmt.Println("Get StopTimes done: ", time.Now().Sub(t))
-	c <- ste
+	c <- toChan
 }
 
 // TODO: move this into its a package that makes more sense

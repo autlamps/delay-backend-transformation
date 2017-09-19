@@ -18,3 +18,10 @@ func CreateCon(DB_URL string) *sql.DB {
 
 	return db
 }
+
+// Needs Work
+func Backup(db *sql.DB) {
+	db.Exec("DROP SCHEMA backup CASCADE;")
+	db.Exec("ALTER SCHEMA public RENAME TO backup;")
+	db.Exec("CREATE SCHEMA public;")
+}

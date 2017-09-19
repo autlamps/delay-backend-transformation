@@ -18,3 +18,8 @@ type CAEntity struct {
 	Saturday  int    `json:"saturday"`
 	Sunday    int    `json:"Wednesday"`
 }
+
+type CAReturn struct {
+	Entities CAEntities
+	Error    error
+}
