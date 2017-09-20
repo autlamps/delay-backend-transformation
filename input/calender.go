@@ -1,17 +1,16 @@
 package input
 
 import (
-	"database/sql"
-	"fmt"
+	"log"
+
 	"github.com/autlamps/delay-backend-transformation/update"
 	"github.com/google/uuid"
-	"log"
 	"github.com/lib/pq"
 )
 
-func CaIn(entities update.CAEntities, db *sql.DB, m map[string]uuid.UUID) {
+func (is *InService) CaIn(entities update.CAEntities) {
 
-	tx, err := db.Begin()
+	tx, err := is.Db.Begin()
 
 	if err != nil {
 		log.Fatal(err)
@@ -32,7 +31,7 @@ func CaIn(entities update.CAEntities, db *sql.DB, m map[string]uuid.UUID) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		m[gtfs_service_id] = service_id
+		is.ServiceMap[gtfs_service_id] = service_id
 
 		_, err = stmt.Exec(gtfs_service_id, service_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday)
 		if err != nil {
@@ -54,7 +53,6 @@ func CaIn(entities update.CAEntities, db *sql.DB, m map[string]uuid.UUID) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Done Calender")
 }
 
 func boolcheck(check int) bool {

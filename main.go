@@ -4,7 +4,6 @@ import (
 	"flag"
 	"log"
 	"os"
-	"runtime"
 
 	"encoding/csv"
 	"encoding/json"
@@ -20,14 +19,12 @@ import (
 	"github.com/autlamps/delay-backend-transformation/database"
 	"github.com/autlamps/delay-backend-transformation/input"
 	"github.com/autlamps/delay-backend-transformation/update"
-	"github.com/google/uuid"
 	_ "github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
 var API_KEY string
 var DB_URL string
-var ID_M map[string]uuid.UUID
 var HTTPForbiden = errors.New("HTTP 403 - Failed")
 
 func init() {
@@ -45,32 +42,27 @@ func init() {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	version, err := getVersion()
-	fmt.Println(version)
+	fmt.Println("Current GTFS verison: ", version)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	t := time.Now()
-	ID_M = make(map[string]uuid.UUID)
-	fmt.Printf("Map addr %p", &ID_M)
-
 	ag := make(chan update.AGReturn)
 	ro := make(chan update.ROReturn)
 	ca := make(chan update.CAReturn)
 	st := make(chan update.STReturn)
 	tr := make(chan update.TRReturn)
-	//stt := make(chan update.STTReturn)
+	stt := make(chan update.STTReturn)
 
 	go getAgency(ag, version)
 	go getRoute(ro, version)
 	go getCalender(ca, version)
 	go getStops(st, version)
 	go getTrip(tr, version)
-	//go getStopTrips(stt, version)
+	go getStopTrips(stt, version)
 
 	AGret := <-ag
 	if AGret.Error != nil {
@@ -102,25 +94,37 @@ func main() {
 	}
 	TRent := TRret.Entities
 
-	//STTret := <-stt
-	//if STTret.Error != nil {
-	//	log.Fatal(STTret.Error)
-	//}
-	//STTent := STTret.Entities
+	STTret := <-stt
+	if STTret.Error != nil {
+		log.Fatal(STTret.Error)
+	}
+	STTent := STTret.Entities
 
 	db := database.CreateCon(DB_URL)
-	input.AgIn(AGent, db, ID_M)
-	fmt.Println(time.Now().Sub(t))
-	input.RoIn(ROent, db, ID_M)
-	fmt.Println(time.Now().Sub(t))
-	input.CaIn(CAent, db, ID_M)
-	fmt.Println(time.Now().Sub(t))
-	input.StIn(STent, db, ID_M)
-	fmt.Println(time.Now().Sub(t))
-	input.TrIn(TRent, db, ID_M)
-	fmt.Println(time.Now().Sub(t))
-	//input.SttIn(STTent, db, ID_M)
-	fmt.Println(time.Now().Sub(t))
+
+	is := input.InService{
+		Db:         db,
+		AgencyMap:  nil,
+		ServiceMap: nil,
+		RouteMap:   nil,
+		TripMap:    nil,
+		StopMap:    nil,
+	}
+
+	is.Init()
+
+	is.AgIn(AGent)
+	fmt.Println("Done Agency: ", time.Now().Sub(t))
+	is.RoIn(ROent)
+	fmt.Println("Done Routes: ", time.Now().Sub(t))
+	is.CaIn(CAent)
+	fmt.Println("Done Calender: ", time.Now().Sub(t))
+	is.StIn(STent)
+	fmt.Println("Done Stops: ", time.Now().Sub(t))
+	is.TrIn(TRent)
+	fmt.Println("Done Trips: ", time.Now().Sub(t))
+	is.SttIn(STTent)
+	fmt.Println("Done StopTime: ", time.Now().Sub(t))
 
 }
 
@@ -393,7 +397,7 @@ func getStopTrips(c chan update.STTReturn, ver string) {
 			continue
 		}
 
-		if strings.Contains(r[0], ver) {
+		if !strings.Contains(r[0], ver) {
 			i++
 			continue
 		}

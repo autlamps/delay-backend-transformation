@@ -1,8 +1,6 @@
 package input
 
 import (
-	"database/sql"
-	"fmt"
 	"log"
 
 	"github.com/autlamps/delay-backend-transformation/update"
@@ -10,10 +8,9 @@ import (
 	"github.com/lib/pq"
 )
 
-func RoIn(entities update.ROEntities, db *sql.DB, m map[string]uuid.UUID) {
-	fmt.Printf("Map addr %p", &m)
+func (is *InService) RoIn(entities update.ROEntities) {
 
-	tx, err := db.Begin()
+	tx, err := is.Db.Begin()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -29,23 +26,15 @@ func RoIn(entities update.ROEntities, db *sql.DB, m map[string]uuid.UUID) {
 		route_short_name := entities[i].RouteSName
 		route_long_name := entities[i].RouteLName
 		route_type := entities[i].RouteType
-		agency_id := m[gtfs_agency_id]
-		var route_id uuid.UUID
-		if m[gtfs_route_id] == uuid.Nil {
-			route_id, err := uuid.NewRandom()
+		agency_id := is.AgencyMap[gtfs_agency_id]
 
-			if err != nil {
-				log.Fatal(err)
-			}
-			m[gtfs_route_id] = route_id
+		route_id, err := uuid.NewRandom()
+
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		if m[gtfs_route_id] != uuid.Nil {
-			route_id = m[gtfs_route_id]
-		}
-
-		fmt.Println(gtfs_route_id)
-		fmt.Println(route_id)
+		is.RouteMap[gtfs_route_id] = route_id
 
 		_, err = stmt.Exec(gtfs_route_id, route_id, agency_id, route_short_name, route_long_name, route_type)
 		if err != nil {
@@ -67,5 +56,4 @@ func RoIn(entities update.ROEntities, db *sql.DB, m map[string]uuid.UUID) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Done Routes")
 }

@@ -1,7 +1,6 @@
 package input
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 
@@ -10,9 +9,9 @@ import (
 	"github.com/lib/pq"
 )
 
-func SttIn(entities update.STTEntities, db *sql.DB, m map[string]uuid.UUID) {
+func (is *InService) SttIn(entities update.STTEntities) {
 
-	tx, err := db.Begin()
+	tx, err := is.Db.Begin()
 
 	if err != nil {
 		log.Fatal(err)
@@ -21,8 +20,11 @@ func SttIn(entities update.STTEntities, db *sql.DB, m map[string]uuid.UUID) {
 	stmt, err := tx.Prepare(pq.CopyIn("stop_times", "stoptime_id", "trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence"))
 
 	for i := 0; i < len(entities); i++ {
-		stop_id := m[entities[i].StopID]
-		trip_id := m[entities[i].TripID]
+		gtfs_trip_id := entities[i].TripID
+		gtfs_stop_id := entities[i].StopID
+		stop_id := is.StopMap[gtfs_stop_id]
+		trip_id := is.TripMap[gtfs_trip_id]
+
 		arrival_time := entities[i].ArrivalTime
 		departure_time := entities[i].DepatureTime
 		stop_sequence := entities[i].StopSequence
@@ -30,8 +32,8 @@ func SttIn(entities update.STTEntities, db *sql.DB, m map[string]uuid.UUID) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		gtfs_stop_time := fmt.Sprint("%v%v", stop_id, trip_id)
-		m[gtfs_stop_time] = stoptime_id
+		gtfs_stop_time := fmt.Sprintf("%v%v", stop_id, trip_id)
+		is.StopTimeMap[gtfs_stop_time] = stoptime_id
 
 		_, err = stmt.Exec(stoptime_id, trip_id, arrival_time, departure_time, stop_id, stop_sequence)
 		if err != nil {
@@ -54,6 +56,4 @@ func SttIn(entities update.STTEntities, db *sql.DB, m map[string]uuid.UUID) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Println("Done Stoptime")
 }

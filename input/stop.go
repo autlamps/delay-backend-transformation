@@ -1,17 +1,16 @@
 package input
 
 import (
-	"database/sql"
-	"fmt"
+	"log"
+
 	"github.com/autlamps/delay-backend-transformation/update"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"log"
 )
 
-func StIn(entities update.STEntities, db *sql.DB, m map[string]uuid.UUID) {
+func (is *InService) StIn(entities update.STEntities) {
 
-	tx, err := db.Begin()
+	tx, err := is.Db.Begin()
 
 	if err != nil {
 		log.Fatal(err)
@@ -23,6 +22,7 @@ func StIn(entities update.STEntities, db *sql.DB, m map[string]uuid.UUID) {
 	}
 
 	for i := 0; i < len(entities); i++ {
+		gtfs_stop_id := entities[i].StopID
 		stop_code := entities[i].StopCode
 		stop_name := entities[i].StopName
 		stop_lat := entities[i].StopLat
@@ -31,7 +31,8 @@ func StIn(entities update.STEntities, db *sql.DB, m map[string]uuid.UUID) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		m[entities[i].StopID] = stop_id
+
+		is.StopMap[gtfs_stop_id] = stop_id
 		_, err = stmt.Exec(stop_id, stop_code, stop_name, stop_lat, stop_lon)
 		if err != nil {
 			log.Fatal(err)
@@ -52,5 +53,4 @@ func StIn(entities update.STEntities, db *sql.DB, m map[string]uuid.UUID) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Done Stops")
 }

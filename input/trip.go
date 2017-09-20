@@ -1,8 +1,6 @@
 package input
 
 import (
-	"database/sql"
-	"fmt"
 	"log"
 
 	"github.com/autlamps/delay-backend-transformation/update"
@@ -10,10 +8,9 @@ import (
 	"github.com/lib/pq"
 )
 
-func TrIn(entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
-	fmt.Println("Map addr %p", &m)
+func (is *InService) TrIn(entities update.TREntities) {
 
-	tx, err := db.Begin()
+	tx, err := is.Db.Begin()
 
 	if err != nil {
 		log.Fatal(err)
@@ -22,10 +19,8 @@ func TrIn(entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
 	stmt, err := tx.Prepare(pq.CopyIn("trips", "gtfs_trip_id", "trip_id", "route_id", "trip_headsign", "service_id"))
 
 	for i := 0; i < len(entities); i++ {
-		route_id := m[entities[i].RouteID]
-		fmt.Println("GTFS ID: ", entities[i].RouteID)
-		fmt.Println("ID: ", route_id)
-		service_id := m[entities[i].ServiceID]
+		route_id := is.RouteMap[entities[i].RouteID]
+		service_id := is.ServiceMap[entities[i].ServiceID]
 		gtfs_trip_id := entities[i].TripID
 		trip_headsign := entities[i].TripHeadSign
 		trip_id, err := uuid.NewRandom()
@@ -34,7 +29,7 @@ func TrIn(entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
 			log.Fatal(err)
 		}
 
-		m[gtfs_trip_id] = trip_id
+		is.TripMap[gtfs_trip_id] = trip_id
 
 		_, err = stmt.Exec(gtfs_trip_id, trip_id, route_id, trip_headsign, service_id)
 		if err != nil {
@@ -56,5 +51,4 @@ func TrIn(entities update.TREntities, db *sql.DB, m map[string]uuid.UUID) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Done Trips")
 }

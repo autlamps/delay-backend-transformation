@@ -1,7 +1,6 @@
 package input
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 
@@ -10,9 +9,9 @@ import (
 	"github.com/lib/pq"
 )
 
-func AgIn(entities update.AGEntities, db *sql.DB, m map[string]uuid.UUID) {
+func (is *InService) AgIn(entities update.AGEntities) {
 
-	tx, err := db.Begin()
+	tx, err := is.Db.Begin()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -27,7 +26,8 @@ func AgIn(entities update.AGEntities, db *sql.DB, m map[string]uuid.UUID) {
 			fmt.Println("No new UUID")
 			log.Fatal(err.Error())
 		}
-		m[gtfs_agency_id] = agency_id
+
+		is.AgencyMap[gtfs_agency_id] = agency_id
 
 		_, err = stmt.Exec(gtfs_agency_id, agency_name, agency_id)
 		if err != nil {
@@ -49,5 +49,4 @@ func AgIn(entities update.AGEntities, db *sql.DB, m map[string]uuid.UUID) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Done Agencies")
 }
