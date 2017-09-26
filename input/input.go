@@ -3,11 +3,14 @@ package input
 import (
 	"database/sql"
 
+	"strings"
+
 	"github.com/google/uuid"
 )
 
 type InService struct {
 	Db          *sql.DB
+	Version     string
 	AgencyMap   map[string]uuid.UUID
 	ServiceMap  map[string]uuid.UUID
 	RouteMap    map[string]uuid.UUID
@@ -23,4 +26,10 @@ func (in *InService) Init() {
 	in.TripMap = make(map[string]uuid.UUID)
 	in.StopMap = make(map[string]uuid.UUID)
 	in.StopTimeMap = make(map[string]uuid.UUID)
+}
+
+func (in *InService) removeVersion(str string) string {
+	toReturn := strings.Replace(str, in.Version, "", -1)
+
+	return toReturn
 }

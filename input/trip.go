@@ -19,9 +19,9 @@ func (is *InService) TrIn(entities update.TREntities) {
 	stmt, err := tx.Prepare(pq.CopyIn("trips", "gtfs_trip_id", "trip_id", "route_id", "trip_headsign", "service_id"))
 
 	for i := 0; i < len(entities); i++ {
-		route_id := is.RouteMap[entities[i].RouteID]
-		service_id := is.ServiceMap[entities[i].ServiceID]
-		gtfs_trip_id := entities[i].TripID
+		route_id := is.RouteMap[is.removeVersion(entities[i].RouteID)]
+		service_id := is.ServiceMap[is.removeVersion(entities[i].ServiceID)]
+		gtfs_trip_id := is.removeVersion(entities[i].TripID)
 		trip_headsign := entities[i].TripHeadSign
 		trip_id, err := uuid.NewRandom()
 

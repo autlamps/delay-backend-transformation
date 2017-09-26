@@ -22,7 +22,7 @@ func (is *InService) StIn(entities update.STEntities) {
 	}
 
 	for i := 0; i < len(entities); i++ {
-		gtfs_stop_id := entities[i].StopID
+		gtfs_stop_id := is.removeVersion(entities[i].StopID)
 		stop_code := entities[i].StopCode
 		stop_name := entities[i].StopName
 		stop_lat := entities[i].StopLat

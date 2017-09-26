@@ -103,6 +103,7 @@ func main() {
 	db := database.CreateCon(DB_URL)
 
 	is := input.InService{
+		Version:    version,
 		Db:         db,
 		AgencyMap:  nil,
 		ServiceMap: nil,

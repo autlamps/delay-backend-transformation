@@ -21,7 +21,7 @@ func (is *InService) RoIn(entities update.ROEntities) {
 	}
 
 	for i := 0; i < len(entities); i++ {
-		gtfs_route_id := entities[i].RouteID
+		gtfs_route_id := is.removeVersion(entities[i].RouteID)
 		gtfs_agency_id := entities[i].AgencyID
 		route_short_name := entities[i].RouteSName
 		route_long_name := entities[i].RouteLName
