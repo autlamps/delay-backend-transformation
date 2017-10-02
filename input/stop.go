@@ -22,7 +22,7 @@ func (is *InService) StIn(entities update.STEntities) {
 	}
 
 	for i := 0; i < len(entities); i++ {
-		gtfs_stop_id := is.removeVersion(entities[i].StopID)
+		gtfs_stop_id := entities[i].StopID
 		stop_code := entities[i].StopCode
 		stop_name := entities[i].StopName
 		stop_lat := entities[i].StopLat
@@ -33,6 +33,10 @@ func (is *InService) StIn(entities update.STEntities) {
 		}
 
 		is.StopMap[gtfs_stop_id] = stop_id
+
+		gtfsID, itemuuid := is.toGTFSMap(is.StopMap, gtfs_stop_id)
+		is.GTFSStopMap[gtfsID] = itemuuid
+
 		_, err = stmt.Exec(stop_id, stop_code, stop_name, stop_lat, stop_lon)
 		if err != nil {
 			log.Fatal(err)

@@ -19,7 +19,7 @@ func (is *InService) CaIn(entities update.CAEntities) {
 	stmt, err := tx.Prepare(pq.CopyIn("calendar", "gtfs_service_id", "service_id", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"))
 
 	for i := 0; i < len(entities); i++ {
-		gtfs_service_id := is.removeVersion(entities[i].ServiceID)
+		gtfs_service_id := entities[i].ServiceID
 		monday := boolcheck(entities[i].Monday)
 		tuesday := boolcheck(entities[i].Tuesday)
 		wednesday := boolcheck(entities[i].Wednesday)

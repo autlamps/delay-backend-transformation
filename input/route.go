@@ -21,7 +21,7 @@ func (is *InService) RoIn(entities update.ROEntities) {
 	}
 
 	for i := 0; i < len(entities); i++ {
-		gtfs_route_id := is.removeVersion(entities[i].RouteID)
+		gtfs_route_id := entities[i].RouteID
 		gtfs_agency_id := entities[i].AgencyID
 		route_short_name := entities[i].RouteSName
 		route_long_name := entities[i].RouteLName
@@ -35,6 +35,8 @@ func (is *InService) RoIn(entities update.ROEntities) {
 		}
 
 		is.RouteMap[gtfs_route_id] = route_id
+		gtfsID, iteamuuid := is.toGTFSMap(is.RouteMap, gtfs_route_id)
+		is.GTFSRouteMap[gtfsID] = iteamuuid
 
 		_, err = stmt.Exec(gtfs_route_id, route_id, agency_id, route_short_name, route_long_name, route_type)
 		if err != nil {

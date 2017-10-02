@@ -20,8 +20,8 @@ func (is *InService) SttIn(entities update.STTEntities) {
 	stmt, err := tx.Prepare(pq.CopyIn("stop_times", "stoptime_id", "trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence"))
 
 	for i := 0; i < len(entities); i++ {
-		gtfs_trip_id := is.removeVersion(entities[i].TripID)
-		gtfs_stop_id := is.removeVersion(entities[i].StopID)
+		gtfs_trip_id := entities[i].TripID
+		gtfs_stop_id := entities[i].StopID
 		stop_id := is.StopMap[gtfs_stop_id]
 		trip_id := is.TripMap[gtfs_trip_id]
 
@@ -34,6 +34,9 @@ func (is *InService) SttIn(entities update.STTEntities) {
 		}
 		gtfs_stop_time := fmt.Sprintf("%v%v", stop_id, trip_id)
 		is.StopTimeMap[gtfs_stop_time] = stoptime_id
+
+		gtfsID, itemuuid := is.toGTFSMap(is.StopTimeMap, gtfs_stop_time)
+		is.GTFSStopTimeMap[gtfsID] = itemuuid
 
 		_, err = stmt.Exec(stoptime_id, trip_id, arrival_time, departure_time, stop_id, stop_sequence)
 		if err != nil {
